@@ -1,5 +1,10 @@
 __kernel void sobel(__global const uchar* input, __global uchar* output, int width, int height, int mode)
 {
+    // mode 0 == horizontal edges
+    // mode 1 == vertical edges
+    // mode 2 == combined
+    // mode 3 == combined approximated
+    
     int x = get_global_id(0);
     int y = get_global_id(1);
 

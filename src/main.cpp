@@ -26,10 +26,9 @@ void RunKernel(int direction, size_t* globalSize);
 void SaveOutput(const char* path, int width, int height, vector<unsigned char>& output);
 
 const char* KernelFile = "sobel.cl";
-// const char* KernelFile = "invert.cl";
 const char* funcName = "sobel";
-// const char* funcName = "invert";
 const char* ImageFile = "city.png";
+// const char* ImageFile = "rose.png";
 const char* HorOutputFile = "horizontal_output.png";
 const char* VerOutputFile = "vertical_output.png";
 const char* CombineOutputFile = "combine_output.png";
