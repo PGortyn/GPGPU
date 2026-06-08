@@ -20,80 +20,85 @@ using namespace std;
 void PrintPlatformData(vector<cl_platform_id> platforms);
 string GetAbsoluteFilePath(const char* path);
 cl_program CreateProgram(cl_context context, const char* path);
-void LoadImage(const char* path);
+unsigned char* LoadImage(const char* path, int& height, int& width);
+void SaveImage(const char* path, int width, int height,vector<unsigned char> output);
 
 int main(int, char**)
 {
-    LoadImage("lenna.png");
-    
-	cl_uint platformCount;
-	clGetPlatformIDs(0, nullptr, &platformCount);
+    int width;
+    int height;
+    unsigned char* inputImage = LoadImage("lenna.png", height, width);
+    if (inputImage == nullptr)
+    {
+        return 1;
+    }
+    vector<unsigned char> output(width * height);
 
-	vector<cl_platform_id> platforms(platformCount);
-	clGetPlatformIDs(platformCount, platforms.data(), nullptr);
-	PrintPlatformData(platforms);
+    cl_int  err;
+    cl_uint platformCount;
+    clGetPlatformIDs(0, nullptr, &platformCount);
 
-    cl_platform_id platformID = platforms[0];
+    vector<cl_platform_id> platforms(platformCount);
+    clGetPlatformIDs(platformCount, platforms.data(), nullptr);
+    PrintPlatformData(platforms);
 
-    cl_device_id deviceID;
-    clGetDeviceIDs(platformID, CL_DEVICE_TYPE_GPU, 1, &deviceID, nullptr);
+    cl_platform_id platform = platforms[0];
 
-    cl_int err;
-    cl_context context = clCreateContext(nullptr, 1, &deviceID, nullptr, nullptr, &err);
+    cl_device_id   device;
+    clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, nullptr);
+
+    cl_context context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &err);
     if (err != CL_SUCCESS)
     {
         cout << "Failed to create context\n";
         return 1;
     }
-
-    cl_command_queue queue = clCreateCommandQueue(context, deviceID, 0, &err);
-
     
-    cl_program program = CreateProgram(context, "test.cl");
-
+    cl_command_queue queue = clCreateCommandQueue(context, device, 0, &err);
+    if (err != CL_SUCCESS)
+    {
+        cout << "Failed to create queue\n";
+        return 1;
+    }
+    
+    cl_program program = CreateProgram(context, "invert.cl");
+    
     if (program == nullptr)
     {
         return 1;
     }
-
-    err = clBuildProgram(program, 1, &deviceID, nullptr, nullptr, nullptr);
-
+    
+    err = clBuildProgram(program, 1, &device, nullptr, nullptr, nullptr);
+    
     if (err != CL_SUCCESS)
     {
         size_t logSize;
-         clGetProgramBuildInfo(program, deviceID, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logSize);
+         clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logSize);
         vector<char> log(logSize);
-
-        clGetProgramBuildInfo(program, deviceID, CL_PROGRAM_BUILD_LOG, logSize, log.data(), nullptr);
-
+    
+        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, logSize, log.data(), nullptr);
+    
         cout << log.data() << endl;
     }
+    
+    cl_kernel kernel = clCreateKernel(program, "invert", &err);
+    
+    cl_mem inputBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, width * height, inputImage, &err);
+    cl_mem outputBuffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, width * height, nullptr, &err);
+    clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputBuffer);
+    clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputBuffer);
 
-    cl_kernel kernel = clCreateKernel(program, "addOne", &err);
-
-    vector<int> values = { 1, 2, 3, 4, 5 };
-
-    cl_mem buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(int) * values.size(), values.data(), &err);
-    clSetKernelArg(kernel, 0, sizeof(cl_mem), &buffer);
-
-    size_t globalSize = values.size();
-
+    size_t globalSize = static_cast<size_t>(width * height);
+    
     err = clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalSize, nullptr, 0, nullptr, nullptr);
-
+    
     clFinish(queue);
-
-    clEnqueueReadBuffer(queue, buffer, CL_TRUE, 0, sizeof(int) * values.size(), values.data(), 0, nullptr, nullptr);
-
-    for (int value : values)
-    {
-        cout << value << " ";
-    }
-    cout << endl;
-
     
+    clEnqueueReadBuffer(queue, outputBuffer, CL_TRUE, 0, width * height, output.data(), 0, nullptr, nullptr);
     
-    // int input;
-    // cin >> input;
+    SaveImage("output1.png", width, height, output);
+
+    stbi_image_free(inputImage);
 	return 0;
 }
 
@@ -140,15 +145,15 @@ cl_program CreateProgram(cl_context context, const char* path)
     return program;
 }
 
-void LoadImage(const char* path)
+unsigned char* LoadImage(const char* path, int& height, int& width)
 {
     string dir = "res/images/";
     string dirPath = dir + path;
     string absolutePath = GetAbsoluteFilePath(dirPath.c_str());
     const char* filePath = absolutePath.c_str();
     
-    int width = 0;
-    int height = 0;
+    width = 0;
+    height = 0;
     int channels = 0;
 
     unsigned char* img = stbi_load(filePath, &width, &height, &channels, 1);
@@ -157,7 +162,7 @@ void LoadImage(const char* path)
     {
         cout << "Failed to load image\n";
         cout << "Absolute Image Path: " << absolutePath << endl;
-        return;
+        return nullptr;
     }
 
     cout << "Image loaded successfully\n";
@@ -167,7 +172,18 @@ void LoadImage(const char* path)
 
     cout << "First pixel value: " << (int)img[0] << "\n";
 
-    stbi_image_free(img);
+    return img;
+    // stbi_image_free(img);
+}
+
+void SaveImage(const char* path, int width, int height, vector<unsigned char> output)
+{
+    string dir = "res/images/";
+    string dirPath = dir + path;
+    string absolutePath = GetAbsoluteFilePath(dirPath.c_str());
+    const char* filePath = absolutePath.c_str();
+
+    stbi_write_png(filePath, width, height, 1, output.data(), width);
 }
 
 string GetAbsoluteFilePath(const char* path)
