@@ -32,6 +32,8 @@ const char* funcName = "sobel";
 const char* ImageFile = "city.png";
 const char* HorOutputFile = "horizontal_output.png";
 const char* VerOutputFile = "vertical_output.png";
+const char* CombineOutputFile = "combine_output.png";
+const char* ApproxCombineOutputFile = "approximate_combine_output.png";
 
 cl_command_queue Queue;
 cl_kernel Kernel;
@@ -112,6 +114,12 @@ int main(int, char**)
 
     RunKernel(1, globalSize);
     SaveOutput(VerOutputFile, width, height, output);
+
+    RunKernel(2, globalSize);
+    SaveOutput(CombineOutputFile, width, height, output);
+
+    RunKernel(3, globalSize);
+    SaveOutput(ApproxCombineOutputFile, width, height, output);
 
     stbi_image_free(inputImage);
 	return 0;

@@ -1,4 +1,4 @@
-__kernel void sobel(__global const uchar* input, __global uchar* output, int width, int height, int direction)
+__kernel void sobel(__global const uchar* input, __global uchar* output, int width, int height, int mode)
 {
     int x = get_global_id(0);
     int y = get_global_id(1);
@@ -25,14 +25,22 @@ __kernel void sobel(__global const uchar* input, __global uchar* output, int wid
     int gy = -p00 - 2 * p01 - p02 + p20 + 2 * p21 + p22;
 
     int value;
-    if (direction == 0)
+    if (mode == 0)
     {
         value = abs(gy);
     }
-    else
+    else if (mode == 1)
     {
         value = abs(gx);
     }    
+    else if (mode == 2)
+    {
+        value = sqrt((float)(gx * gx + gy * gy));
+    }
+    else
+    {
+        value = abs(gx) + abs(gy);
+    }
 
     if (value > 255)
     {
