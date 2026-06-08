@@ -95,12 +95,20 @@ int main(int, char**)
 
 cl_program CreateProgram(cl_context context, const char* path)
 {
+#ifdef __APPLE__
+    filesystem::path p = path;
+    cout << "Absolute path: " << filesystem::absolute(p) << endl;
+    string dir = "Documents/Studia/PKG/GPGPU/res/kernels/";
+    string fullPath = dir + path;
+#else
     filesystem::path p = path;
     cout << "Absolute path: " << filesystem::absolute(p) << endl;
     string relative = "../";
     string dir = "res/kernels/";
     string fullPath = relative + dir + path;
-    string ageihniojk = filesystem::absolute(fullPath).string();
+#endif
+    string ageihniojk = std::filesystem::absolute(fullPath).string();
+    cout << "Absolute path to kernel: " << ageihniojk << endl;
     const char* filePath = ageihniojk.c_str();
     // 1. retrieve the vertex/fragment source code from filePath
     std::string clCode;
