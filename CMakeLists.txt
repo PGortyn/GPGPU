@@ -17,6 +17,12 @@ target_include_directories(
     PRIVATE include
 )
 
+target_include_directories(
+	GPGPU 
+	PRIVATE
+    ${CMAKE_SOURCE_DIR}/thirdparty/stb_image
+)
+
 target_link_libraries(
     GPGPU
     OpenCL::OpenCL
@@ -33,4 +39,13 @@ add_custom_command(TARGET GPGPU POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/res
     $<TARGET_FILE_DIR:GPGPU>/res
+)
+
+file(GLOB STB_HEADERS
+    ${CMAKE_SOURCE_DIR}/thirdparty/stb_image/*.h
+)
+
+source_group(TREE ${CMAKE_SOURCE_DIR}/thirdparty/stb_image
+    PREFIX "ThirdParty\\stb"
+    FILES ${STB_HEADERS}
 )

@@ -9,21 +9,23 @@
 #include <sstream>
 #include <vector>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 using namespace std;
 
-const char* source = R"(
-__kernel void addOne(__global int* data)
-{
-    int id = get_global_id(0);
-    data[id] += 1;
-}
-)";
-
 void PrintPlatformData(vector<cl_platform_id> platforms);
+string GetAbsoluteFilePath(const char* path);
 cl_program CreateProgram(cl_context context, const char* path);
+void LoadImage(const char* path);
 
 int main(int, char**)
 {
+    LoadImage("lenna.png");
+    
 	cl_uint platformCount;
 	clGetPlatformIDs(0, nullptr, &platformCount);
 
@@ -95,21 +97,10 @@ int main(int, char**)
 
 cl_program CreateProgram(cl_context context, const char* path)
 {
-#ifdef __APPLE__
-    filesystem::path p = path;
-    cout << "Absolute path: " << filesystem::absolute(p) << endl;
-    string dir = "Documents/Studia/PKG/GPGPU/res/kernels/";
-    string fullPath = dir + path;
-#else
-    filesystem::path p = path;
-    cout << "Absolute path: " << filesystem::absolute(p) << endl;
-    string relative = "../";
     string dir = "res/kernels/";
-    string fullPath = relative + dir + path;
-#endif
-    string ageihniojk = std::filesystem::absolute(fullPath).string();
-    cout << "Absolute path to kernel: " << ageihniojk << endl;
-    const char* filePath = ageihniojk.c_str();
+    string dirPath = dir + path;
+    string absolutePath = GetAbsoluteFilePath(dirPath.c_str());
+    const char* filePath = absolutePath.c_str();
     // 1. retrieve the vertex/fragment source code from filePath
     std::string clCode;
     std::ifstream clFile;
@@ -129,7 +120,8 @@ cl_program CreateProgram(cl_context context, const char* path)
     }
     catch (std::ifstream::failure e)
     {
-       cout << "ERROR::KERNEL::FILE_NOT_SUCCESSFULLY_READ\n";
+        cout << "ERROR::KERNEL::FILE_NOT_SUCCESSFULLY_READ\n";
+        cout << "Absolute path to kernel: " << absolutePath << endl;
         return nullptr;
     }
     const char* code = clCode.c_str();
@@ -144,6 +136,56 @@ cl_program CreateProgram(cl_context context, const char* path)
     }
 
     return program;
+}
+
+void LoadImage(const char* path)
+{
+    string dir = "res/images/";
+    string dirPath = dir + path;
+    string absolutePath = GetAbsoluteFilePath(dirPath.c_str());
+    const char* filePath = absolutePath.c_str();
+    
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    unsigned char* img = stbi_load(
+        filePath,
+        &width,
+        &height,
+        &channels,
+        1 // force grayscale
+    );
+
+    if (!img)
+    {
+        std::cout << "Failed to load image\n";
+        cout << "Absolute Image Path: " << absolutePath << endl;
+        return;
+    }
+
+    std::cout << "Image loaded successfully\n";
+    std::cout << "Width: " << width << "\n";
+    std::cout << "Height: " << height << "\n";
+    std::cout << "Channels: " << channels << "\n";
+
+    std::cout << "First pixel value: " << (int)img[0] << "\n";
+
+    stbi_image_free(img);
+}
+
+string GetAbsoluteFilePath(const char* path)
+{
+#ifdef __APPLE__
+    string relative = "Documents/Studia/PKG/GPGPU/";
+    string fullPath = relative + path;
+#else
+    string relative = "../";
+    string fullPath = relative + path;
+#endif
+    string absolutePath = std::filesystem::absolute(fullPath).string();
+
+    return absolutePath;
 }
 
 void PrintPlatformData(vector<cl_platform_id> platforms)
