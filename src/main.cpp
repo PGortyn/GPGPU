@@ -177,8 +177,10 @@ void LoadImage(const char* path)
 string GetAbsoluteFilePath(const char* path)
 {
 #ifdef __APPLE__
-    string relative = "Documents/Studia/PKG/GPGPU/";
-    string fullPath = relative + path;
+    // string relative = "Documents/Studia/PKG/GPGPU/";
+    // string fullPath = relative + path;
+    string fullPath = path;
+    cout << "full path: " << fullPath << endl;
 #else
     string relative = "../";
     string fullPath = relative + path;
