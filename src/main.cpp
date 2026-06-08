@@ -89,6 +89,8 @@ int main(int, char**)
         cout << value << " ";
     }
     cout << endl;
+
+    
     
     // int input;
     // cin >> input;
@@ -102,10 +104,10 @@ cl_program CreateProgram(cl_context context, const char* path)
     string absolutePath = GetAbsoluteFilePath(dirPath.c_str());
     const char* filePath = absolutePath.c_str();
     // 1. retrieve the vertex/fragment source code from filePath
-    std::string clCode;
-    std::ifstream clFile;
+    string clCode;
+    ifstream clFile;
     // ensure ifstream objects can throw exceptions:
-    clFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    clFile.exceptions(ifstream::failbit | ifstream::badbit);
     try
     {
         // open files
@@ -118,7 +120,7 @@ cl_program CreateProgram(cl_context context, const char* path)
         // convert stream into string
         clCode = cShaderStream.str();
     }
-    catch (std::ifstream::failure e)
+    catch (ifstream::failure e)
     {
         cout << "ERROR::KERNEL::FILE_NOT_SUCCESSFULLY_READ\n";
         cout << "Absolute path to kernel: " << absolutePath << endl;
@@ -149,27 +151,21 @@ void LoadImage(const char* path)
     int height = 0;
     int channels = 0;
 
-    unsigned char* img = stbi_load(
-        filePath,
-        &width,
-        &height,
-        &channels,
-        1 // force grayscale
-    );
+    unsigned char* img = stbi_load(filePath, &width, &height, &channels, 1);
 
     if (!img)
     {
-        std::cout << "Failed to load image\n";
+        cout << "Failed to load image\n";
         cout << "Absolute Image Path: " << absolutePath << endl;
         return;
     }
 
-    std::cout << "Image loaded successfully\n";
-    std::cout << "Width: " << width << "\n";
-    std::cout << "Height: " << height << "\n";
-    std::cout << "Channels: " << channels << "\n";
+    cout << "Image loaded successfully\n";
+    cout << "Width: " << width << "\n";
+    cout << "Height: " << height << "\n";
+    cout << "Channels: " << channels << "\n";
 
-    std::cout << "First pixel value: " << (int)img[0] << "\n";
+    cout << "First pixel value: " << (int)img[0] << "\n";
 
     stbi_image_free(img);
 }
@@ -185,7 +181,7 @@ string GetAbsoluteFilePath(const char* path)
     string relative = "../";
     string fullPath = relative + path;
 #endif
-    string absolutePath = std::filesystem::absolute(fullPath).string();
+    string absolutePath = filesystem::absolute(fullPath).string();
 
     return absolutePath;
 }
@@ -195,33 +191,16 @@ void PrintPlatformData(vector<cl_platform_id> platforms)
     for (cl_uint p = 0; p < platforms.size(); ++p)
     {
         char platformName[1024];
-        clGetPlatformInfo(
-            platforms[p],
-            CL_PLATFORM_NAME,
-            sizeof(platformName),
-            platformName,
-            nullptr);
+        clGetPlatformInfo(platforms[p], CL_PLATFORM_NAME, sizeof(platformName), platformName, nullptr);
 
-        std::cout << "Platform: "
-                  << platformName
-                  << "\n";
+        cout << "Platform: " << platformName << "\n";
 
         cl_uint deviceCount = 0;
-        clGetDeviceIDs(
-            platforms[p],
-            CL_DEVICE_TYPE_ALL,
-            0,
-            nullptr,
-            &deviceCount);
+        clGetDeviceIDs(platforms[p], CL_DEVICE_TYPE_ALL, 0, nullptr, &deviceCount);
 
-        std::vector<cl_device_id> devices(deviceCount);
+        vector<cl_device_id> devices(deviceCount);
 
-        clGetDeviceIDs(
-            platforms[p],
-            CL_DEVICE_TYPE_ALL,
-            deviceCount,
-            devices.data(),
-            nullptr);
+        clGetDeviceIDs(platforms[p], CL_DEVICE_TYPE_ALL, deviceCount, devices.data(), nullptr);
 
         for (cl_uint d = 0; d < deviceCount; ++d)
         {
@@ -231,49 +210,15 @@ void PrintPlatformData(vector<cl_platform_id> platforms)
             cl_uint computeUnits;
             size_t maxWorkGroupSize;
 
-            clGetDeviceInfo(
-                devices[d],
-                CL_DEVICE_NAME,
-                sizeof(deviceName),
-                deviceName,
-                nullptr);
+            clGetDeviceInfo(devices[d], CL_DEVICE_NAME, sizeof(deviceName), deviceName, nullptr);
+            clGetDeviceInfo(devices[d], CL_DEVICE_VENDOR, sizeof(vendor), vendor, nullptr);
+            clGetDeviceInfo(devices[d], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(computeUnits), &computeUnits, nullptr);
+            clGetDeviceInfo(devices[d], CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr);
 
-            clGetDeviceInfo(
-                devices[d],
-                CL_DEVICE_VENDOR,
-                sizeof(vendor),
-                vendor,
-                nullptr);
-
-            clGetDeviceInfo(
-                devices[d],
-                CL_DEVICE_MAX_COMPUTE_UNITS,
-                sizeof(computeUnits),
-                &computeUnits,
-                nullptr);
-
-            clGetDeviceInfo(
-                devices[d],
-                CL_DEVICE_MAX_WORK_GROUP_SIZE,
-                sizeof(maxWorkGroupSize),
-                &maxWorkGroupSize,
-                nullptr);
-
-            std::cout << "  Device: "
-                      << deviceName
-                      << "\n";
-
-            std::cout << "  Vendor: "
-                      << vendor
-                      << "\n";
-
-            std::cout << "  Compute Units: "
-                      << computeUnits
-                      << "\n";
-
-            std::cout << "  Max Work Group Size: "
-                      << maxWorkGroupSize
-                      << "\n\n";
+            cout << "  Device: " << deviceName << "\n";
+            cout << "  Vendor: " << vendor << "\n";
+            cout << "  Compute Units: " << computeUnits << "\n";
+            cout << "  Max Work Group Size: " << maxWorkGroupSize << "\n\n";
         }
     }
 }
