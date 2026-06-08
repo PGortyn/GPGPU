@@ -19,15 +19,32 @@ using namespace std;
 
 void PrintPlatformData(vector<cl_platform_id> platforms);
 string GetAbsoluteFilePath(const char* path);
-cl_program CreateProgram(cl_context context, const char* path);
+cl_program CreateProgram(const char* path);
 unsigned char* LoadImage(const char* path, int& height, int& width);
 void SaveImage(const char* path, int width, int height,vector<unsigned char> output);
+void RunKernel(int direction, size_t* globalSize);
+void SaveOutput(const char* path, int width, int height, vector<unsigned char>& output);
+
+const char* KernelFile = "sobel.cl";
+// const char* KernelFile = "invert.cl";
+const char* funcName = "sobel";
+// const char* funcName = "invert";
+const char* ImageFile = "city.png";
+const char* HorOutputFile = "horizontal_output.png";
+const char* VerOutputFile = "vertical_output.png";
+
+cl_command_queue Queue;
+cl_kernel Kernel;
+cl_context Context;
+cl_program Program;
+cl_mem InputBuffer;
+cl_mem OutputBuffer;
 
 int main(int, char**)
 {
     int width;
     int height;
-    unsigned char* inputImage = LoadImage("lenna.png", height, width);
+    unsigned char* inputImage = LoadImage(ImageFile, height, width);
     if (inputImage == nullptr)
     {
         return 1;
@@ -44,65 +61,77 @@ int main(int, char**)
 
     cl_platform_id platform = platforms[0];
 
-    cl_device_id   device;
+    cl_device_id device;
     clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, nullptr);
 
-    cl_context context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &err);
+    Context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &err);
     if (err != CL_SUCCESS)
     {
         cout << "Failed to create context\n";
         return 1;
     }
     
-    cl_command_queue queue = clCreateCommandQueue(context, device, 0, &err);
+    Queue = clCreateCommandQueue(Context, device, 0, &err);
     if (err != CL_SUCCESS)
     {
         cout << "Failed to create queue\n";
         return 1;
     }
     
-    cl_program program = CreateProgram(context, "invert.cl");
-    
-    if (program == nullptr)
+    Program = CreateProgram(KernelFile);
+    if (Program == nullptr)
     {
         return 1;
     }
     
-    err = clBuildProgram(program, 1, &device, nullptr, nullptr, nullptr);
-    
+    err = clBuildProgram(Program, 1, &device, nullptr, nullptr, nullptr);
     if (err != CL_SUCCESS)
     {
         size_t logSize;
-         clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logSize);
+         clGetProgramBuildInfo(Program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logSize);
         vector<char> log(logSize);
     
-        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, logSize, log.data(), nullptr);
+        clGetProgramBuildInfo(Program, device, CL_PROGRAM_BUILD_LOG, logSize, log.data(), nullptr);
     
         cout << log.data() << endl;
     }
     
-    cl_kernel kernel = clCreateKernel(program, "invert", &err);
+    Kernel = clCreateKernel(Program, funcName, &err);
     
-    cl_mem inputBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, width * height, inputImage, &err);
-    cl_mem outputBuffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, width * height, nullptr, &err);
-    clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputBuffer);
-    clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputBuffer);
+    InputBuffer = clCreateBuffer(Context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, width * height, inputImage, &err);
+    OutputBuffer = clCreateBuffer(Context, CL_MEM_WRITE_ONLY, width * height, nullptr, &err);
+    clSetKernelArg(Kernel, 0, sizeof(cl_mem), &InputBuffer);
+    clSetKernelArg(Kernel, 1, sizeof(cl_mem), &OutputBuffer);
+    clSetKernelArg(Kernel, 2, sizeof(int), &width);
+    clSetKernelArg(Kernel, 3, sizeof(int), &height);
 
-    size_t globalSize = static_cast<size_t>(width * height);
-    
-    err = clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalSize, nullptr, 0, nullptr, nullptr);
-    
-    clFinish(queue);
-    
-    clEnqueueReadBuffer(queue, outputBuffer, CL_TRUE, 0, width * height, output.data(), 0, nullptr, nullptr);
-    
-    SaveImage("output1.png", width, height, output);
+    size_t globalSize[2] = { static_cast<size_t>(width), static_cast<size_t>(height) };
+
+    RunKernel(0, globalSize);
+    SaveOutput(HorOutputFile, width, height, output);
+
+    RunKernel(1, globalSize);
+    SaveOutput(VerOutputFile, width, height, output);
 
     stbi_image_free(inputImage);
 	return 0;
 }
 
-cl_program CreateProgram(cl_context context, const char* path)
+void RunKernel(int direction, size_t* globalSize)
+{
+    clSetKernelArg(Kernel, 4, sizeof(int), &direction);
+    clEnqueueNDRangeKernel(Queue, Kernel, 2, nullptr, globalSize, nullptr, 0, nullptr, nullptr);
+    // clEnqueueNDRangeKernel(Queue, Kernel, 1, nullptr, &globalSize, nullptr, 0, nullptr, nullptr);
+    clFinish(Queue);
+}
+
+void SaveOutput(const char* path, int width, int height, vector<unsigned char>& output)
+{
+    clEnqueueReadBuffer(Queue, OutputBuffer, CL_TRUE, 0, width * height, output.data(), 0, nullptr, nullptr);
+    SaveImage(path, width, height, output);
+}
+
+cl_program CreateProgram(const char* path)
 {
     string dir = "res/kernels/";
     string dirPath = dir + path;
@@ -134,7 +163,7 @@ cl_program CreateProgram(cl_context context, const char* path)
     const char* code = clCode.c_str();
 
     cl_int err;
-    cl_program program = clCreateProgramWithSource(context, 1, &code, nullptr, &err);
+    cl_program program = clCreateProgramWithSource(Context, 1, &code, nullptr, &err);
 
     if (err != CL_SUCCESS)
     {
@@ -165,12 +194,7 @@ unsigned char* LoadImage(const char* path, int& height, int& width)
         return nullptr;
     }
 
-    cout << "Image loaded successfully\n";
-    cout << "Width: " << width << "\n";
-    cout << "Height: " << height << "\n";
-    cout << "Channels: " << channels << "\n";
-
-    cout << "First pixel value: " << (int)img[0] << "\n";
+    cout << "Image loaded successfully\n  Size is: " << width << "x" << height << endl;
 
     return img;
     // stbi_image_free(img);
